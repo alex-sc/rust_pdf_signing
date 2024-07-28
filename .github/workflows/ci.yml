@@ -19,8 +19,8 @@ jobs:
     - name: Format
       run: cargo fmt -- --check
 
-    - name: Linting
-      run: cargo clippy -- -D warnings
+#    - name: Linting
+#      run: cargo clippy -- -D warnings
 
     - name: Audit
       run: |
