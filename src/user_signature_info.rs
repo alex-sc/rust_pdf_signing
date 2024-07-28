@@ -1,5 +1,6 @@
 use cryptographic_message_syntax::SignerBuilder;
 use serde::{Deserialize, Serialize};
+use x509_certificate::CapturedX509Certificate;
 
 /// The info provided to PDF service when a document needs to be signed.
 #[derive(Clone)]
@@ -9,6 +10,7 @@ pub struct UserSignatureInfo<'a> {
     pub user_email: String,
     pub user_signature: Vec<u8>,
     pub user_signing_keys: SignerBuilder<'a>,
+    pub user_certificate: CapturedX509Certificate,
 }
 
 /// The info inside the PDF form signature.

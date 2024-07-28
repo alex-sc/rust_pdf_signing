@@ -5,7 +5,7 @@ use x509_certificate::{CapturedX509Certificate, InMemorySigningKeyPair};
 
 fn main() {
     // let pdf_file_name = "test-small-1sig.pdf";
-    let pdf_file_name = "test-small-3sig.pdf";
+    let pdf_file_name = "test-small-1sig.pdf";
     let pdf_data = std::fs::read(format!("./examples/assets/{}", pdf_file_name)).unwrap();
 
     // Use Cert/Private key to sign data
@@ -14,7 +14,7 @@ fn main() {
     let x509_cert = CapturedX509Certificate::from_pem(cert).unwrap();
     let private_key_data = std::fs::read_to_string("./examples/assets/pkcs8.pem").unwrap();
     let private_key = InMemorySigningKeyPair::from_pkcs8_pem(&private_key_data).unwrap();
-    let signer = SignerBuilder::new(&private_key, x509_cert);
+    let signer = SignerBuilder::new(&private_key, x509_cert.clone());
     // Try using a time server. If it fails we continue without it.
     // Alternative time servers:
     // 1: https://freetsa.org/tsr
@@ -32,6 +32,7 @@ fn main() {
             user_email: "alice@test.com".to_owned(),
             user_signature: std::fs::read("./examples/assets/sig1.png").unwrap(),
             user_signing_keys: signer.clone(),
+            user_certificate: x509_cert.clone(),
         },
         UserSignatureInfo {
             user_id: "256".to_owned(),
@@ -39,6 +40,7 @@ fn main() {
             user_email: "bob@test.com".to_owned(),
             user_signature: std::fs::read("./examples/assets/sig2.png").unwrap(),
             user_signing_keys: signer.clone(),
+            user_certificate: x509_cert.clone(),
         },
         UserSignatureInfo {
             user_id: "272".to_owned(),
@@ -46,21 +48,8 @@ fn main() {
             user_email: "charlie@test.com".to_owned(),
             user_signature: std::fs::read("./examples/assets/sig1.png").unwrap(),
             user_signing_keys: signer.clone(),
-        },
-        UserSignatureInfo {
-            user_id: "292".to_owned(),
-            user_name: "Dave".to_owned(),
-            user_email: "dave@test.com".to_owned(),
-            user_signature: std::fs::read("./examples/assets/sig3.png").unwrap(),
-            user_signing_keys: signer.clone(),
-        },
-        UserSignatureInfo {
-            user_id: "274".to_owned(),
-            user_name: "Ester".to_owned(),
-            user_email: "ester@test.com".to_owned(),
-            user_signature: std::fs::read("./examples/assets/sig2.png").unwrap(),
-            user_signing_keys: signer.clone(),
-        },
+            user_certificate: x509_cert.clone(),
+        }
     ];
 
     let mut pdf_signing_document =

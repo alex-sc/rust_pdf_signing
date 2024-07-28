@@ -3,8 +3,32 @@ use crate::{ByteRange, PDFSigningDocument, UserSignatureInfo};
 use cryptographic_message_syntax::{Bytes, Oid, SignedContent, SignedDataBuilder};
 use lopdf::ObjectId;
 use std::io::Write;
+use sha2::{Digest, Sha256};
+use bcder::{Captured, encode::Values, OctetString};
+use bcder::Mode::Der;
+use x509_certificate::rfc5652::AttributeValue;
 
 impl PDFSigningDocument {
+    fn compute_cert_hash(cert: Vec<u8>) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(&cert);
+        hasher.finalize().to_vec()
+    }
+
+    fn build_signing_certificate_v2_attribute_value(cert_hash: Vec<u8>) -> Captured {
+        let certificate_hash_octet_string = OctetString::new(Bytes::from(cert_hash));
+
+        let ess_cert_id_v2 = bcder::encode::sequence(
+            certificate_hash_octet_string.encode()
+        );
+
+        let signing_certificate_v2 = bcder::encode::sequence(ess_cert_id_v2);
+
+        let signing_certificate_attr_value = bcder::encode::sequence(signing_certificate_v2);
+
+        return signing_certificate_attr_value.to_captured(Der);
+    }
+
     /// Digitally signs the document using a cryptographically secure algorithm.
     /// Note that using this function will prevent you from changing anything else about the document.
     /// Changing the document in any other way will invalidate the cryptographic check.
@@ -55,6 +79,15 @@ impl PDFSigningDocument {
         //     String::from_utf8_lossy(&second_part[(second_part.len() - 5)..])
         // );
 
+        // 1.2.840.113549.1.9.16.2.47
+        let signing_certificate_v2_oid = Oid(Bytes::copy_from_slice(&[42,134,72,134,247,13,1,9,16,2,47,]));
+        let cert_hash = Self::compute_cert_hash(user_info.user_certificate.encode_der().unwrap());
+        let signing_certificate_v2_value = Self::build_signing_certificate_v2_attribute_value(cert_hash);
+
+        // Add signing_certificate_v2 attribute to the signer
+        let mut signer = user_info.user_signing_keys.clone();
+        signer = signer.signed_attribute(signing_certificate_v2_oid, vec![AttributeValue::new(signing_certificate_v2_value)]);
+
         // create new vec without the content part
         let mut vec = Vec::with_capacity(byte_range.get_capacity_inclusive());
         vec.extend_from_slice(first_part);
@@ -66,7 +99,7 @@ impl PDFSigningDocument {
             .content_type(Oid(Bytes::copy_from_slice(
                 cryptographic_message_syntax::asn1::rfc5652::OID_ID_DATA.as_ref(),
             )))
-            .signer(user_info.user_signing_keys.clone())
+            .signer(signer.clone())
             .build_der()
             .unwrap();
 
