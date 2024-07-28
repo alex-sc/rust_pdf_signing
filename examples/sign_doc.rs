@@ -49,7 +49,7 @@ fn main() {
             user_signature: std::fs::read("./examples/assets/sig1.png").unwrap(),
             user_signing_keys: signer.clone(),
             user_certificate: x509_cert.clone(),
-        }
+        },
     ];
 
     let mut pdf_signing_document =

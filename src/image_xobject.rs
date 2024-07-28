@@ -169,7 +169,12 @@ impl From<ImageXObject> for lopdf::Stream {
             ColorType::Rgba | ColorType::GrayscaleAlpha => "DeviceN",
         };
         let identity_matrix: Vec<f64> = vec![1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
-        let bbox: lopdf::Object = Array(identity_matrix.into_iter().map(|a| Real(a as f32)).collect());
+        let bbox: lopdf::Object = Array(
+            identity_matrix
+                .into_iter()
+                .map(|a| Real(a as f32))
+                .collect(),
+        );
 
         let mut dict = lopdf::Dictionary::from_iter(vec![
             ("Type", Name("XObject".as_bytes().to_vec())),
@@ -180,7 +185,10 @@ impl From<ImageXObject> for lopdf::Stream {
             ("BitsPerComponent", Integer(image.bits_per_component as i64)),
             ("ColorSpace", Name(cs.as_bytes().to_vec())),
             ("BBox", bbox),
-            ("Resources", lopdf::Object::Dictionary(lopdf::Dictionary::new()))
+            (
+                "Resources",
+                lopdf::Object::Dictionary(lopdf::Dictionary::new()),
+            ),
         ]);
         if let Some(s_mask) = image.s_mask {
             dict.set("SMask", Reference(s_mask));

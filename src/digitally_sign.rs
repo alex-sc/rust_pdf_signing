@@ -1,11 +1,11 @@
 use crate::error::Error;
 use crate::{ByteRange, PDFSigningDocument, UserSignatureInfo};
+use bcder::Mode::Der;
+use bcder::{encode::Values, Captured, OctetString};
 use cryptographic_message_syntax::{Bytes, Oid, SignedContent, SignedDataBuilder};
 use lopdf::ObjectId;
-use std::io::Write;
 use sha2::{Digest, Sha256};
-use bcder::{Captured, encode::Values, OctetString};
-use bcder::Mode::Der;
+use std::io::Write;
 use x509_certificate::rfc5652::AttributeValue;
 
 impl PDFSigningDocument {
@@ -18,9 +18,7 @@ impl PDFSigningDocument {
     fn build_signing_certificate_v2_attribute_value(cert_hash: Vec<u8>) -> Captured {
         let certificate_hash_octet_string = OctetString::new(Bytes::from(cert_hash));
 
-        let ess_cert_id_v2 = bcder::encode::sequence(
-            certificate_hash_octet_string.encode()
-        );
+        let ess_cert_id_v2 = bcder::encode::sequence(certificate_hash_octet_string.encode());
 
         let signing_certificate_v2 = bcder::encode::sequence(ess_cert_id_v2);
 
@@ -80,13 +78,19 @@ impl PDFSigningDocument {
         // );
 
         // 1.2.840.113549.1.9.16.2.47
-        let signing_certificate_v2_oid = Oid(Bytes::copy_from_slice(&[42,134,72,134,247,13,1,9,16,2,47,]));
+        let signing_certificate_v2_oid = Oid(Bytes::copy_from_slice(&[
+            42, 134, 72, 134, 247, 13, 1, 9, 16, 2, 47,
+        ]));
         let cert_hash = Self::compute_cert_hash(user_info.user_certificate.encode_der().unwrap());
-        let signing_certificate_v2_value = Self::build_signing_certificate_v2_attribute_value(cert_hash);
+        let signing_certificate_v2_value =
+            Self::build_signing_certificate_v2_attribute_value(cert_hash);
 
         // Add signing_certificate_v2 attribute to the signer
         let mut signer = user_info.user_signing_keys.clone();
-        signer = signer.signed_attribute(signing_certificate_v2_oid, vec![AttributeValue::new(signing_certificate_v2_value)]);
+        signer = signer.signed_attribute(
+            signing_certificate_v2_oid,
+            vec![AttributeValue::new(signing_certificate_v2_value)],
+        );
 
         // create new vec without the content part
         let mut vec = Vec::with_capacity(byte_range.get_capacity_inclusive());
