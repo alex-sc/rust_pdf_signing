@@ -19,11 +19,11 @@ fn main() {
     // Alternative time servers:
     // 1: https://freetsa.org/tsr
     // 2: http://timestamp.digicert.com
-    // let signer_fallback = signer.clone();
-    // let signer = signer
-    //     .time_stamp_url("http://timestamp.digicert.com")
-    //     .or::<reqwest::Error>(Ok(signer_fallback))
-    //     .expect("Can not happen because of fallback.");
+    let signer_fallback = signer.clone();
+    let signer = signer
+         .time_stamp_url("http://timestamp.digicert.com")
+         .or::<reqwest::Error>(Ok(signer_fallback))
+         .expect("Can not happen because of fallback.");
 
     let users_signature_info = vec![
         UserSignatureInfo {
