@@ -169,7 +169,7 @@ impl From<ImageXObject> for lopdf::Stream {
             ColorType::Rgba | ColorType::GrayscaleAlpha => "DeviceN",
         };
         let identity_matrix: Vec<f64> = vec![1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
-        let bbox: lopdf::Object = Array(identity_matrix.into_iter().map(Real).collect());
+        let bbox: lopdf::Object = Array(identity_matrix.into_iter().map(|a| Real(a as f32)).collect());
 
         let mut dict = lopdf::Dictionary::from_iter(vec![
             ("Type", Name("XObject".as_bytes().to_vec())),
