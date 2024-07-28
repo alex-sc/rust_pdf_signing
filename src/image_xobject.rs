@@ -180,6 +180,7 @@ impl From<ImageXObject> for lopdf::Stream {
             ("BitsPerComponent", Integer(image.bits_per_component as i64)),
             ("ColorSpace", Name(cs.as_bytes().to_vec())),
             ("BBox", bbox),
+            ("Resources", lopdf::Object::Dictionary(lopdf::Dictionary::new()))
         ]);
         if let Some(s_mask) = image.s_mask {
             dict.set("SMask", Reference(s_mask));
