@@ -4,6 +4,8 @@ use chrono::Utc;
 use lopdf::ObjectId;
 
 impl PDFSigningDocument {
+    pub const SIGNATURE_SIZE: usize = 20_000;
+
     // Change the signature to add extra info about the signing application
     pub(crate) fn add_general_info_to_signature(
         &mut self,
@@ -124,7 +126,7 @@ impl PDFSigningDocument {
             ),
             (
                 "Contents", // Will be filled in later
-                String(vec![0u8; 9000], StringFormat::Hexadecimal),
+                String(vec![0u8; Self::SIGNATURE_SIZE / 2], StringFormat::Hexadecimal),
             ),
             (
                 "M",

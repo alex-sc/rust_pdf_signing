@@ -17,10 +17,8 @@ fn main() {
         std::fs::read_to_string("./examples/assets/keystore-local-key.pem").unwrap();
     let private_key = InMemorySigningKeyPair::from_pkcs8_pem(&private_key_data).unwrap();
     let signer = SignerBuilder::new(&private_key, x509_cert.clone());
+
     // Try using a time server. If it fails we continue without it.
-    // Alternative time servers:
-    // 1: https://freetsa.org/tsr
-    // 2: http://timestamp.digicert.com
     let signer_fallback = signer.clone();
     let signer = signer
         .time_stamp_url("http://timestamp.digicert.com")
@@ -29,28 +27,12 @@ fn main() {
 
     let users_signature_info = vec![
         UserSignatureInfo {
-            user_id: "9".to_owned(),
-            user_name: "Alice".to_owned(),
-            user_email: "alice@test.com".to_owned(),
-            user_signature: std::fs::read("./examples/assets/sig1.png").unwrap(),
-            user_signing_keys: signer.clone(),
-            user_certificate: x509_cert.clone(),
-        },
-        UserSignatureInfo {
-            user_id: "256".to_owned(),
-            user_name: "Bob".to_owned(),
-            user_email: "bob@test.com".to_owned(),
-            user_signature: std::fs::read("./examples/assets/sig2.png").unwrap(),
-            user_signing_keys: signer.clone(),
-            user_certificate: x509_cert.clone(),
-        },
-        UserSignatureInfo {
             user_id: "272".to_owned(),
             user_name: "Charlie".to_owned(),
             user_email: "charlie@test.com".to_owned(),
             user_signature: std::fs::read("./examples/assets/sig1.png").unwrap(),
             user_signing_keys: signer.clone(),
-            user_certificate: x509_cert.clone(),
+            user_certificate_chain: x509_certs.clone(),
         },
     ];
 

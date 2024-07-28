@@ -10,7 +10,7 @@ pub struct UserSignatureInfo<'a> {
     pub user_email: String,
     pub user_signature: Vec<u8>,
     pub user_signing_keys: SignerBuilder<'a>,
-    pub user_certificate: CapturedX509Certificate,
+    pub user_certificate_chain: Vec<CapturedX509Certificate>,
 }
 
 /// The info inside the PDF form signature.

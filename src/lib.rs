@@ -118,7 +118,7 @@ impl PDFSigningDocument {
     ) -> Result<Vec<u8>, Error> {
         self.load_all()?;
         // Set PDF version, version 1.5 is the minimum version required.
-        self.raw_document.new_document.version = "1.5".to_owned();
+        self.raw_document.new_document.version = "1.5".parse().unwrap();
 
         // loop over AcroForm elements
         let mut acro_forms = self.acro_form.clone();
@@ -135,7 +135,7 @@ impl PDFSigningDocument {
             .collect();
 
         // Make sure we never end up in an infinite loop, should not happen.
-        // But better safe then sorry.
+        // But better safe than sorry.
         let mut loop_counter: u16 = 0;
         // Loop over all the form fields and sign them one by one.
         while let Some(form_field) = form_field_current {
@@ -186,7 +186,6 @@ impl PDFSigningDocument {
                     pdf_document_image.file_name,
                 )?);
                 self.load_all()?;
-                self.raw_document.new_document.version = "1.5".to_owned();
                 acro_forms = self.acro_form.clone();
                 // Set as return value
                 last_binary_pdf = Some(new_binary_pdf);

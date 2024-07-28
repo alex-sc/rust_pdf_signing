@@ -9,6 +9,7 @@ use std::io::Write;
 use x509_certificate::rfc5652::AttributeValue;
 
 impl PDFSigningDocument {
+
     fn compute_cert_hash(cert: Vec<u8>) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(&cert);
@@ -77,11 +78,13 @@ impl PDFSigningDocument {
         //     String::from_utf8_lossy(&second_part[(second_part.len() - 5)..])
         // );
 
+        let user_certificate_chain = user_info.user_certificate_chain.clone();
+        let user_certificate = user_certificate_chain[0].clone();
         // 1.2.840.113549.1.9.16.2.47
         let signing_certificate_v2_oid = Oid(Bytes::copy_from_slice(&[
             42, 134, 72, 134, 247, 13, 1, 9, 16, 2, 47,
         ]));
-        let cert_hash = Self::compute_cert_hash(user_info.user_certificate.encode_der().unwrap());
+        let cert_hash = Self::compute_cert_hash(user_certificate.encode_der().unwrap());
         let signing_certificate_v2_value =
             Self::build_signing_certificate_v2_attribute_value(cert_hash);
 
@@ -98,12 +101,18 @@ impl PDFSigningDocument {
         vec.extend_from_slice(second_part);
 
         // Calculate file hash and sign it using the users key
-        let signature = SignedDataBuilder::default()
+        let mut builder = SignedDataBuilder::default()
             .content_external(vec)
             .content_type(Oid(Bytes::copy_from_slice(
                 cryptographic_message_syntax::asn1::rfc5652::OID_ID_DATA.as_ref(),
             )))
-            .signer(signer.clone())
+            .signer(signer.clone());
+        for i in 0..user_certificate_chain.len() {
+            builder = builder.certificate(user_certificate_chain[i].clone());
+        }
+
+
+        let signature = builder
             .build_der()
             .unwrap();
 
@@ -166,7 +175,7 @@ impl PDFSigningDocument {
         // Determine the byte ranged
         // Find the `Content` part of the file
         let pattern_prefix = b"/Contents<";
-        let pattern_content = vec![48u8; 18000]; // 48 = 0x30 = `0`
+        let pattern_content = vec![48u8; Self::SIGNATURE_SIZE]; // 48 = 0x30 = `0`
 
         if content.len() > pattern_content.len() {
             panic!(
@@ -228,7 +237,7 @@ impl PDFSigningDocument {
         // Determine the byte ranged
         // Find the `Content` part of the file
         let pattern_prefix = b"/ByteRange[0 10000 20000 10000]/Contents<";
-        let pattern_content = vec![48u8; 18000]; // 48 = 0x30 = `0`
+        let pattern_content = vec![48u8; Self::SIGNATURE_SIZE]; // 48 = 0x30 = `0`
         let mut pattern = pattern_prefix.to_vec();
         pattern.extend_from_slice(&pattern_content[..=50]); // Just add the first part, rest will be okay
 
