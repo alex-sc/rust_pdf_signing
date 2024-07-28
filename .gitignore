@@ -1,12 +1,6 @@
 /target
 Cargo.lock
 
-# Do not include keys
-*.pem
-*.crt
-*.key
-*.der
-*.bin
 
 # When profiling build times
 # RUSTFLAGS='-Z time-passes' cargo build

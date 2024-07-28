@@ -10,9 +10,11 @@ fn main() {
 
     // Use Cert/Private key to sign data
     // To create cert, see `Create_Cert.md` file.
-    let cert = std::fs::read_to_string("./examples/assets/pdf_cert.crt").unwrap();
-    let x509_cert = CapturedX509Certificate::from_pem(cert).unwrap();
-    let private_key_data = std::fs::read_to_string("./examples/assets/pkcs8.pem").unwrap();
+    let cert = std::fs::read_to_string("./examples/assets/keystore-local-chain.pem").unwrap();
+    let x509_certs = CapturedX509Certificate::from_pem_multiple(cert).unwrap();
+    let x509_cert = &x509_certs[0];
+    let private_key_data =
+        std::fs::read_to_string("./examples/assets/keystore-local-key.pem").unwrap();
     let private_key = InMemorySigningKeyPair::from_pkcs8_pem(&private_key_data).unwrap();
     let signer = SignerBuilder::new(&private_key, x509_cert.clone());
     // Try using a time server. If it fails we continue without it.
