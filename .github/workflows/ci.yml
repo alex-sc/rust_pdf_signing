@@ -12,12 +12,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+
     - name: Run tests
       run: cargo test
+
     - name: Format
       run: cargo fmt -- --check
+
     - name: Linting
       run: cargo clippy -- -D warnings
+
     - name: Audit
       run: |
         cargo update

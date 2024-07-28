@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::{image_xobject::ImageXObject, rectangle::Rectangle, Error, InsertImage};
 use lopdf::{
     content::{Content, Operation},

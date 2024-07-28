@@ -24,7 +24,7 @@ impl PDFSigningDocument {
 
         let signing_certificate_attr_value = bcder::encode::sequence(signing_certificate_v2);
 
-        return signing_certificate_attr_value.to_captured(Der);
+        signing_certificate_attr_value.to_captured(Der)
     }
 
     /// Digitally signs the document using a cryptographically secure algorithm.
