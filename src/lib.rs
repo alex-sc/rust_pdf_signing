@@ -173,8 +173,11 @@ impl PDFSigningDocument {
 
             // Update pdf (when nothing else is incorrect)
             // Insert signature images into pdf itself.
-            let pdf_document_user_info_opt =
-                self.add_signature_images(form_field, &users_signature_info_map)?;
+            let pdf_document_user_info_opt = self.add_signature_images(
+                form_field,
+                &users_signature_info_map,
+                signature_options,
+            )?;
 
             // PDF has been updated, now we need to digitally sign it.
             if let Some((pdf_document_image, user_form_info)) = pdf_document_user_info_opt {

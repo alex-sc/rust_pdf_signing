@@ -64,7 +64,8 @@ impl PDFSigningDocument {
         let mut pdf_file_data: Vec<u8> = Vec::new();
         self.write_document(&mut pdf_file_data)?;
 
-        let (byte_range, pdf_file_data) = Self::set_next_byte_range(pdf_file_data);
+        let (byte_range, pdf_file_data) =
+            Self::set_next_byte_range(pdf_file_data, signature_options);
 
         let first_part = &pdf_file_data[byte_range.get_range(0)];
         let second_part = &pdf_file_data[byte_range.get_range(1)];
@@ -137,7 +138,7 @@ impl PDFSigningDocument {
         }
 
         // Write signature to file
-        let pdf_file_data = Self::set_content(pdf_file_data, signature);
+        let pdf_file_data = Self::set_content(pdf_file_data, signature, signature_options);
 
         Ok(pdf_file_data)
     }
@@ -185,11 +186,15 @@ impl PDFSigningDocument {
     }
 
     // Find and set the `Content` field in the signature
-    fn set_content(mut pdf_file_data: Vec<u8>, content: Vec<u8>) -> Vec<u8> {
+    fn set_content(
+        mut pdf_file_data: Vec<u8>,
+        content: Vec<u8>,
+        signature_options: &SignatureOptions,
+    ) -> Vec<u8> {
         // Determine the byte ranged
         // Find the `Content` part of the file
         let pattern_prefix = b"/Contents<";
-        let pattern_content = vec![48u8; Self::SIGNATURE_SIZE]; // 48 = 0x30 = `0`
+        let pattern_content = vec![48u8; signature_options.signature_size]; // 48 = 0x30 = `0`
 
         if content.len() > pattern_content.len() {
             panic!(
@@ -247,11 +252,14 @@ impl PDFSigningDocument {
     }
 
     /// Set the next found byte `ByteRange` that still has the default values.
-    fn set_next_byte_range(mut pdf_file_data: Vec<u8>) -> (ByteRange, Vec<u8>) {
+    fn set_next_byte_range(
+        mut pdf_file_data: Vec<u8>,
+        signature_options: &SignatureOptions,
+    ) -> (ByteRange, Vec<u8>) {
         // Determine the byte ranged
         // Find the `Content` part of the file
         let pattern_prefix = b"/ByteRange[0 10000 20000 10000]/Contents<";
-        let pattern_content = vec![48u8; Self::SIGNATURE_SIZE]; // 48 = 0x30 = `0`
+        let pattern_content = vec![48u8; signature_options.signature_size]; // 48 = 0x30 = `0`
         let mut pattern = pattern_prefix.to_vec();
         pattern.extend_from_slice(&pattern_content[..=50]); // Just add the first part, rest will be okay
 
@@ -285,7 +293,7 @@ impl PDFSigningDocument {
 
         // Construct new ByteRange and insert it into file
         // Note: Notice the `0`s after `Contents<` this is to make sure that if the `ByteRange`
-        // is shorter then the pattern that any other chars are overwritten.
+        // is shorter than the pattern that any other chars are overwritten.
         // Have at least "0 10000 20000 10000".len() + "{}".len() `0`s. (and even number)
         let mut new_byte_range_string = format!(
             "/ByteRange[{}]/Contents<0000000000000000000000",

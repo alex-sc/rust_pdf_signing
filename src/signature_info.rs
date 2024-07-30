@@ -1,11 +1,9 @@
-use crate::PDFSigningDocument;
 use crate::{error::Error, UserSignatureInfo};
+use crate::{PDFSigningDocument, SignatureOptions};
 use chrono::Utc;
 use lopdf::ObjectId;
 
 impl PDFSigningDocument {
-    pub const SIGNATURE_SIZE: usize = 30_000;
-
     // Change the signature to add extra info about the signing application
     pub(crate) fn add_general_info_to_signature(
         &mut self,
@@ -13,6 +11,7 @@ impl PDFSigningDocument {
         new_appearance_id: ObjectId,
         user_signature_info: &UserSignatureInfo,
         _signature_name: &str,
+        signature_options: &SignatureOptions,
     ) -> Result<(), Error> {
         use lopdf::{Object::*, StringFormat};
         let _root_obj_id = self
@@ -127,7 +126,7 @@ impl PDFSigningDocument {
             (
                 "Contents", // Will be filled in later
                 String(
-                    vec![0u8; Self::SIGNATURE_SIZE / 2],
+                    vec![0u8; signature_options.signature_size / 2],
                     StringFormat::Hexadecimal,
                 ),
             ),

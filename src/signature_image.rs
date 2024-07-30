@@ -3,7 +3,7 @@ use crate::error::Error;
 use crate::pdf_object::PdfObjectDeref;
 use crate::rectangle::Rectangle;
 use crate::user_signature_info::{UserFormSignatureInfo, UserSignatureInfo};
-use crate::{InsertImage, PDFSigningDocument};
+use crate::{InsertImage, PDFSigningDocument, SignatureOptions};
 use lopdf::ObjectId;
 use std::collections::HashMap;
 
@@ -12,6 +12,7 @@ impl PDFSigningDocument {
         &mut self,
         signature_element: AcroForm,
         users_signature_info_map: &HashMap<String, UserSignatureInfo>,
+        signature_options: &SignatureOptions,
     ) -> Result<Option<(Self, UserFormSignatureInfo)>, Error> {
         let mut pdf_signing_document = self.clone();
 
@@ -93,6 +94,7 @@ impl PDFSigningDocument {
                 image_object_id,
                 user_signature_info,
                 encoded_data,
+                signature_options,
             )?;
         } else {
             log::error!(

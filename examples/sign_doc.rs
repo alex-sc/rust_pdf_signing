@@ -1,5 +1,5 @@
 use cryptographic_message_syntax::SignerBuilder;
-use pdf_signing::{signature_options::SignatureOptions, PDFSigningDocument, UserSignatureInfo};
+use pdf_signing::{PDFSigningDocument, UserSignatureInfo};
 use std::{fs::File, io::Write};
 use x509_certificate::{CapturedX509Certificate, InMemorySigningKeyPair};
 
