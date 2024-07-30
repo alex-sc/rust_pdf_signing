@@ -1,20 +1,23 @@
 use bcder::encode::Values;
 use bcder::Mode::Der;
-use bcder::{encode::PrimitiveContent, Captured, Integer, OctetString, Oid, Tag};
+use bcder::{encode::PrimitiveContent, Captured, Integer, Mode, OctetString, Oid, Tag};
 use cryptographic_message_syntax::Bytes;
 use rasn::ber::encode;
 use rasn::types::ObjectIdentifier;
 use rasn_ocsp::{CertId, Request, TbsRequest};
 use reqwest::blocking::Client;
 use std::borrow::Cow;
+use std::io::Write;
 use x509_certificate::rfc5652::AttributeValue;
 use x509_certificate::CapturedX509Certificate;
+use x509_parser::extensions::DistributionPointName::FullName;
 use x509_parser::extensions::ParsedExtension::AuthorityInfoAccess;
 use x509_parser::num_bigint::{BigInt, Sign};
+use x509_parser::prelude::ParsedExtension::CRLDistributionPoints;
 use x509_parser::prelude::*;
 
 pub(crate) fn get_ocsp_crl_url(
-    captured_cert: CapturedX509Certificate,
+    captured_cert: &CapturedX509Certificate,
 ) -> (Option<String>, Option<String>) {
     let binding = captured_cert.encode_der().unwrap();
     let x509_certificate = X509Certificate::from_der(&*binding);
@@ -29,9 +32,18 @@ pub(crate) fn get_ocsp_crl_url(
                     if let GeneralName::URI(ocsp) = &access_desc.access_location {
                         ocsp_url = Some(ocsp.to_string());
                     }
-                } else if "1.3.6.1.5.5.7.48.2".eq(&access_desc.access_method.to_string()) {
-                    if let GeneralName::URI(crl) = &access_desc.access_location {
-                        crl_url = Some(crl.to_string());
+                }
+            }
+        } else if let CRLDistributionPoints(crl_dp) = parsed {
+            for dist_point in &crl_dp.points {
+                if let Some(point) = &dist_point.distribution_point {
+                    if let FullName(names_list) = &point {
+                        if names_list.len() > 0 {
+                            let name = &names_list[0];
+                            if let GeneralName::URI(crl) = name {
+                                crl_url = Some(crl.to_string());
+                            }
+                        }
                     }
                 }
             }
@@ -42,7 +54,7 @@ pub(crate) fn get_ocsp_crl_url(
 }
 
 pub(crate) fn fetch_ocsp_response(
-    captured_cert: CapturedX509Certificate,
+    captured_cert: &CapturedX509Certificate,
     ocsp_url: String,
 ) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
     let binding = captured_cert.encode_der().unwrap();
@@ -59,7 +71,6 @@ pub(crate) fn fetch_ocsp_response(
 
     if response.status().is_success() {
         let ocsp_resp = response.bytes()?;
-        //print!("{:?}", ocsp_resp);
         return Ok(Some(ocsp_resp.to_vec()));
     } else {
         eprintln!("OCSP request failed with status: {}", response.status());
@@ -104,18 +115,65 @@ pub(crate) fn create_ocsp_request(
     Ok(encode(&ocsp_req).unwrap())
 }
 
+pub(crate) fn fetch_crl_response(
+    crl_url: String,
+) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
+    let client = Client::new();
+    //println!("{}", crl_url);
+    let response = client.get(&crl_url).send().unwrap();
+
+    if response.status().is_success() {
+        let crl_resp = response.bytes()?;
+        //print!("{:?}", crl_resp);
+        return Ok(Some(crl_resp.to_vec()));
+    } else {
+        eprintln!("CRL request failed with status: {}", response.status());
+        return Ok(None);
+    }
+}
+
+pub struct CrlReponse {
+    pub bytes: Bytes,
+}
+
+impl Values for CrlReponse {
+    fn encoded_len(&self, _: Mode) -> usize {
+        //self.encode_ref().encoded_len(Mode::Der)
+        self.bytes.len()
+    }
+
+    fn write_encoded<W: Write>(&self, _: Mode, target: &mut W) -> Result<(), std::io::Error> {
+        target.write_all(&*self.bytes)
+    }
+}
+
 pub(crate) fn encode_revocation_info_archival<'a>(
-    crl: Option<Vec<u8>>,
-    ocsp: Option<Vec<u8>>,
+    crl: Vec<Vec<u8>>,
+    ocsp: Vec<Vec<u8>>,
 ) -> Option<Captured> {
     let mut revocation_vector = Vec::new();
 
-    if crl.is_some() {
+    if crl.len() > 0 {
+        let mut crl_responses = Vec::new();
+
+        for cr in crl {
+            let crl_response = CrlReponse {
+                bytes: Bytes::copy_from_slice(cr.as_slice()),
+            };
+            crl_responses.push(crl_response);
+        }
+
+        let crl_responses = bcder::encode::sequence(crl_responses);
+
+        let crl_tagged = bcder::encode::sequence_as(Tag::CTX_0, crl_responses);
+
         // crl [0] EXPLICIT SEQUENCE of CRLs, OPTIONAL
+        revocation_vector.push(crl_tagged);
     }
 
-    if ocsp.is_some() {
-        let ocsp_encoded = OctetString::new(Bytes::from(ocsp.unwrap()));
+    //    let mut ocsp2 = None;
+    if ocsp.len() > 0 {
+        let ocsp_encoded = OctetString::new(Bytes::from(ocsp[0].clone()));
         // 1.3.6.1.5.5.7.48.1.1 - id_pkix_ocsp_basic
         let adbe_revocation_oid = Oid(Bytes::copy_from_slice(&[43, 6, 1, 5, 5, 7, 48, 1, 1]));
         let basic_ocsp_response =
@@ -133,7 +191,8 @@ pub(crate) fn encode_revocation_info_archival<'a>(
         let ocsp_tagged = bcder::encode::sequence_as(Tag::CTX_1, ocsp_responses);
 
         // ocsp [1] EXPLICIT SEQUENCE of OCSP Responses, OPTIONAL
-        revocation_vector.push(ocsp_tagged);
+        //ocsp2 = Some(ocsp_tagged.to_captured(Der));
+        //revocation_vector.push(ocsp_tagged);
     }
 
     Some(bcder::encode::sequence(revocation_vector).to_captured(Der))
@@ -142,17 +201,26 @@ pub(crate) fn encode_revocation_info_archival<'a>(
 pub(crate) fn build_adbe_revocation_attribute(
     user_certificate_chain: &Vec<CapturedX509Certificate>,
 ) -> Option<(Oid, Vec<AttributeValue>)> {
-    let user_certificate = user_certificate_chain[0].clone();
+    let mut crl_data = Vec::new();
+    let mut ocsp_data = Vec::new();
 
-    let (ocsp_url, crl_url) = get_ocsp_crl_url(user_certificate.clone());
-    let mut crl_data = None;
-    let mut ocsp_data = None;
-    if let Some(ocsp) = ocsp_url {
-        ocsp_data = fetch_ocsp_response(user_certificate, ocsp).unwrap();
+    for cert in user_certificate_chain {
+        let (ocsp_url, crl_url) = get_ocsp_crl_url(cert);
+
+        if let Some(ocsp) = ocsp_url {
+            let cert_ocsp_data = fetch_ocsp_response(cert, ocsp);
+            if cert_ocsp_data.is_ok() {
+                ocsp_data.push(cert_ocsp_data.unwrap().unwrap());
+            }
+        }
+        if let Some(crl) = crl_url {
+            let cert_crl_data = fetch_crl_response(crl).unwrap();
+            if cert_crl_data.is_some() {
+                crl_data.push(cert_crl_data.unwrap());
+            }
+        }
     }
-    if let Some(crl) = crl_url {
-        // TOOD:
-    }
+
     let encoded_revocation_info = encode_revocation_info_archival(crl_data, ocsp_data);
     if encoded_revocation_info.is_some() {
         let adbe_revocation_oid = Oid(Bytes::copy_from_slice(&[
