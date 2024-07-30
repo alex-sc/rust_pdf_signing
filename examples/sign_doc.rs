@@ -25,16 +25,14 @@ fn main() {
         .or::<reqwest::Error>(Ok(signer_fallback))
         .expect("Can not happen because of fallback.");
 
-    let users_signature_info = vec![
-        UserSignatureInfo {
-            user_id: "272".to_owned(),
-            user_name: "Charlie".to_owned(),
-            user_email: "charlie@test.com".to_owned(),
-            user_signature: std::fs::read("./examples/assets/sig1.png").unwrap(),
-            user_signing_keys: signer.clone(),
-            user_certificate_chain: x509_certs.clone(),
-        },
-    ];
+    let users_signature_info = vec![UserSignatureInfo {
+        user_id: "272".to_owned(),
+        user_name: "Charlie".to_owned(),
+        user_email: "charlie@test.com".to_owned(),
+        user_signature: std::fs::read("./examples/assets/sig1.png").unwrap(),
+        user_signing_keys: signer.clone(),
+        user_certificate_chain: x509_certs.clone(),
+    }];
 
     let mut pdf_signing_document =
         PDFSigningDocument::read_from(&*pdf_data, pdf_file_name.to_owned()).unwrap();

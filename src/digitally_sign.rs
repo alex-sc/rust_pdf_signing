@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::ltv::build_adbe_revocation_attribute;
 use crate::{ByteRange, PDFSigningDocument, UserSignatureInfo};
 use bcder::Mode::Der;
 use bcder::{encode::Values, Captured, OctetString};
@@ -9,7 +10,6 @@ use std::io::Write;
 use x509_certificate::rfc5652::AttributeValue;
 
 impl PDFSigningDocument {
-
     fn compute_cert_hash(cert: Vec<u8>) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(&cert);
@@ -95,6 +95,12 @@ impl PDFSigningDocument {
             vec![AttributeValue::new(signing_certificate_v2_value)],
         );
 
+        // Add adbe-revocationInfoArchival signed attribute
+        let adbe = build_adbe_revocation_attribute(&user_certificate_chain);
+        if let Some((oid, values)) = adbe {
+            signer = signer.signed_attribute(oid, values);
+        }
+
         // create new vec without the content part
         let mut vec = Vec::with_capacity(byte_range.get_capacity_inclusive());
         vec.extend_from_slice(first_part);
@@ -111,10 +117,7 @@ impl PDFSigningDocument {
             builder = builder.certificate(user_certificate_chain[i].clone());
         }
 
-
-        let signature = builder
-            .build_der()
-            .unwrap();
+        let signature = builder.build_der().unwrap();
 
         #[cfg(feature = "debug")]
         {

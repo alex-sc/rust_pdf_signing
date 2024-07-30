@@ -6,6 +6,7 @@ mod image_insert;
 mod image_insert_to_page;
 mod image_xobject;
 mod lopdf_utils;
+mod ltv;
 mod pdf_object;
 mod rectangle;
 mod signature_image;
