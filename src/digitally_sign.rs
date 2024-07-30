@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::ltv::build_adbe_revocation_attribute;
+use crate::signature_options::SignatureOptions;
 use crate::{ByteRange, PDFSigningDocument, UserSignatureInfo};
 use bcder::Mode::Der;
 use bcder::{encode::Values, Captured, OctetString};
@@ -34,6 +35,7 @@ impl PDFSigningDocument {
     pub(crate) fn digitally_sign_document(
         &self,
         user_info: &UserSignatureInfo,
+        signature_options: &SignatureOptions,
     ) -> Result<Vec<u8>, Error> {
         // TODO: Code should be enabled in the future, do not remove.
         // Decompose `pdf_document` into it parts.
@@ -96,10 +98,18 @@ impl PDFSigningDocument {
         );
 
         // Add adbe-revocationInfoArchival signed attribute
-        let adbe_revocation_data =
-            build_adbe_revocation_attribute(&user_certificate_chain, true, false);
+        let adbe_revocation_data = build_adbe_revocation_attribute(
+            &user_certificate_chain,
+            signature_options.signed_attribute_include_crl,
+            signature_options.signed_attribute_include_ocsp,
+        );
         if let Some((oid, values)) = adbe_revocation_data {
             signer = signer.signed_attribute(oid, values);
+        }
+
+        // Timestamp
+        if let Some(tsa_url) = &signature_options.timestamp_url {
+            signer = signer.time_stamp_url(tsa_url).unwrap()
         }
 
         // create new vec without the content part

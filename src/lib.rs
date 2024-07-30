@@ -11,6 +11,7 @@ mod pdf_object;
 mod rectangle;
 mod signature_image;
 mod signature_info;
+pub mod signature_options;
 mod user_signature_info;
 
 use acro_form::AcroForm;
@@ -27,6 +28,7 @@ use std::{fs::File, path::Path};
 
 pub use error::Error;
 pub use lopdf;
+pub use signature_options::SignatureOptions;
 pub use user_signature_info::{UserFormSignatureInfo, UserSignatureInfo};
 
 /// The whole PDF document. This struct only loads part of the document on demand.
@@ -116,6 +118,7 @@ impl PDFSigningDocument {
     pub fn sign_document(
         &mut self,
         users_signature_info: Vec<UserSignatureInfo>,
+        signature_options: &SignatureOptions,
     ) -> Result<Vec<u8>, Error> {
         self.load_all()?;
         // Set PDF version, version 1.5 is the minimum version required.
@@ -180,7 +183,8 @@ impl PDFSigningDocument {
                     .get(&user_form_info.user_id)
                     .ok_or_else(|| Error::Other("User was not found".to_owned()))?;
 
-                let new_binary_pdf = pdf_document_image.digitally_sign_document(user_info)?;
+                let new_binary_pdf =
+                    pdf_document_image.digitally_sign_document(user_info, signature_options)?;
                 // Reload file
                 self.copy_from(Self::read_from(
                     &*new_binary_pdf,
