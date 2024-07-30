@@ -96,8 +96,9 @@ impl PDFSigningDocument {
         );
 
         // Add adbe-revocationInfoArchival signed attribute
-        let adbe = build_adbe_revocation_attribute(&user_certificate_chain);
-        if let Some((oid, values)) = adbe {
+        let adbe_revocation_data =
+            build_adbe_revocation_attribute(&user_certificate_chain, true, false);
+        if let Some((oid, values)) = adbe_revocation_data {
             signer = signer.signed_attribute(oid, values);
         }
 

@@ -69,13 +69,13 @@ pub(crate) fn fetch_ocsp_response(
         .body(ocsp_req)
         .send()?;
 
-    if response.status().is_success() {
+    return if response.status().is_success() {
         let ocsp_resp = response.bytes()?;
-        return Ok(Some(ocsp_resp.to_vec()));
+        Ok(Some(ocsp_resp.to_vec()))
     } else {
         eprintln!("OCSP request failed with status: {}", response.status());
-        return Ok(None);
-    }
+        Ok(None)
+    };
 }
 
 pub(crate) fn create_ocsp_request(
@@ -138,7 +138,6 @@ pub struct CrlReponse {
 
 impl Values for CrlReponse {
     fn encoded_len(&self, _: Mode) -> usize {
-        //self.encode_ref().encoded_len(Mode::Der)
         self.bytes.len()
     }
 
@@ -148,17 +147,17 @@ impl Values for CrlReponse {
 }
 
 pub(crate) fn encode_revocation_info_archival<'a>(
-    crl: Vec<Vec<u8>>,
-    ocsp: Vec<Vec<u8>>,
+    crls_bytes: Vec<Vec<u8>>,
+    ocsps_bytes: Vec<Vec<u8>>,
 ) -> Option<Captured> {
     let mut revocation_vector = Vec::new();
 
-    if crl.len() > 0 {
+    if crls_bytes.len() > 0 {
         let mut crl_responses = Vec::new();
 
-        for cr in crl {
+        for crl_bytes in crls_bytes {
             let crl_response = CrlReponse {
-                bytes: Bytes::copy_from_slice(cr.as_slice()),
+                bytes: Bytes::copy_from_slice(crl_bytes.as_slice()),
             };
             crl_responses.push(crl_response);
         }
@@ -168,31 +167,33 @@ pub(crate) fn encode_revocation_info_archival<'a>(
         let crl_tagged = bcder::encode::sequence_as(Tag::CTX_0, crl_responses);
 
         // crl [0] EXPLICIT SEQUENCE of CRLs, OPTIONAL
-        revocation_vector.push(crl_tagged);
+        revocation_vector.push(crl_tagged.to_captured(Der));
     }
 
-    //    let mut ocsp2 = None;
-    if ocsp.len() > 0 {
-        let ocsp_encoded = OctetString::new(Bytes::from(ocsp[0].clone()));
-        // 1.3.6.1.5.5.7.48.1.1 - id_pkix_ocsp_basic
-        let adbe_revocation_oid = Oid(Bytes::copy_from_slice(&[43, 6, 1, 5, 5, 7, 48, 1, 1]));
-        let basic_ocsp_response =
-            bcder::encode::sequence((adbe_revocation_oid.encode(), ocsp_encoded.encode()));
+    if ocsps_bytes.len() > 0 {
+        let mut ocsp_responses = Vec::new();
+        for ocsp_bytes in ocsps_bytes {
+            let ocsp_encoded = OctetString::new(Bytes::from(ocsp_bytes.clone()));
+            // 1.3.6.1.5.5.7.48.1.1 - id_pkix_ocsp_basic
+            let pkix_ocsp_basic_oid = Oid(Bytes::copy_from_slice(&[43, 6, 1, 5, 5, 7, 48, 1, 1]));
+            let basic_ocsp_response =
+                bcder::encode::sequence((pkix_ocsp_basic_oid.encode(), ocsp_encoded.encode()));
 
-        let tagged_basic_ocsp_response =
-            bcder::encode::sequence_as(Tag::CTX_0, basic_ocsp_response);
-        let tagged_seq = Integer::from(0u8)
-            .encode_as(Tag::ENUMERATED)
-            .to_captured(Der);
-        let ocsp_response = bcder::encode::sequence((tagged_seq, tagged_basic_ocsp_response));
+            let tagged_basic_ocsp_response =
+                bcder::encode::sequence_as(Tag::CTX_0, basic_ocsp_response);
+            let tagged_seq = Integer::from(0u8)
+                .encode_as(Tag::ENUMERATED)
+                .to_captured(Der);
+            let ocsp_response = bcder::encode::sequence((tagged_seq, tagged_basic_ocsp_response));
+            ocsp_responses.push(ocsp_response);
+        }
 
-        let ocsp_responses = bcder::encode::sequence(ocsp_response);
+        let ocsp_responses = bcder::encode::sequence(ocsp_responses);
 
         let ocsp_tagged = bcder::encode::sequence_as(Tag::CTX_1, ocsp_responses);
 
         // ocsp [1] EXPLICIT SEQUENCE of OCSP Responses, OPTIONAL
-        //ocsp2 = Some(ocsp_tagged.to_captured(Der));
-        //revocation_vector.push(ocsp_tagged);
+        revocation_vector.push(ocsp_tagged.to_captured(Der));
     }
 
     Some(bcder::encode::sequence(revocation_vector).to_captured(Der))
@@ -200,23 +201,28 @@ pub(crate) fn encode_revocation_info_archival<'a>(
 
 pub(crate) fn build_adbe_revocation_attribute(
     user_certificate_chain: &Vec<CapturedX509Certificate>,
+    include_crl: bool,
+    include_ocsp: bool,
 ) -> Option<(Oid, Vec<AttributeValue>)> {
     let mut crl_data = Vec::new();
     let mut ocsp_data = Vec::new();
-
     for cert in user_certificate_chain {
         let (ocsp_url, crl_url) = get_ocsp_crl_url(cert);
 
-        if let Some(ocsp) = ocsp_url {
-            let cert_ocsp_data = fetch_ocsp_response(cert, ocsp);
-            if cert_ocsp_data.is_ok() {
-                ocsp_data.push(cert_ocsp_data.unwrap().unwrap());
+        if include_ocsp {
+            if let Some(ocsp) = ocsp_url {
+                let cert_ocsp_data = fetch_ocsp_response(cert, ocsp);
+                if cert_ocsp_data.is_ok() {
+                    ocsp_data.push(cert_ocsp_data.unwrap().unwrap());
+                }
             }
         }
-        if let Some(crl) = crl_url {
-            let cert_crl_data = fetch_crl_response(crl).unwrap();
-            if cert_crl_data.is_some() {
-                crl_data.push(cert_crl_data.unwrap());
+        if include_crl {
+            if let Some(crl) = crl_url {
+                let cert_crl_data = fetch_crl_response(crl).unwrap();
+                if cert_crl_data.is_some() {
+                    crl_data.push(cert_crl_data.unwrap());
+                }
             }
         }
     }
