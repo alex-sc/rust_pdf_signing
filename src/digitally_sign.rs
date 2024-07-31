@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::ltv::build_adbe_revocation_attribute;
+use crate::ltv::{append_dss_dictionary, build_adbe_revocation_attribute};
 use crate::signature_options::SignatureOptions;
 use crate::{ByteRange, PDFSigningDocument, UserSignatureInfo};
 use bcder::Mode::Der;
@@ -138,7 +138,11 @@ impl PDFSigningDocument {
         }
 
         // Write signature to file
-        let pdf_file_data = Self::set_content(pdf_file_data, signature, signature_options);
+        let mut pdf_file_data = Self::set_content(pdf_file_data, signature, signature_options);
+
+        if signature_options.include_dss {
+            pdf_file_data = append_dss_dictionary(pdf_file_data, user_certificate_chain);
+        }
 
         Ok(pdf_file_data)
     }

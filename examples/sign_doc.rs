@@ -1,7 +1,8 @@
 use cryptographic_message_syntax::SignerBuilder;
-use pdf_signing::{PDFSigningDocument, UserSignatureInfo};
+use pdf_signing::{PDFSigningDocument, SignatureOptions, UserSignatureInfo};
 use std::{fs::File, io::Write};
 use x509_certificate::{CapturedX509Certificate, InMemorySigningKeyPair};
+use pdf_signing::signature_options::SignatureFormat::PADES;
 
 fn main() {
     let pdf_file_name = "test-small-1sig.pdf";
@@ -25,7 +26,10 @@ fn main() {
         user_certificate_chain: x509_certs.clone(),
     }];
 
-    let signature_parameters = Default::default();
+    let mut signature_parameters: SignatureOptions = Default::default();
+    signature_parameters.format = PADES;
+    signature_parameters.signed_attribute_include_ocsp = false;
+    signature_parameters.signed_attribute_include_crl = false;
 
     let mut pdf_signing_document =
         PDFSigningDocument::read_from(&*pdf_data, pdf_file_name.to_owned()).unwrap();

@@ -2,6 +2,7 @@ use crate::{error::Error, UserSignatureInfo};
 use crate::{PDFSigningDocument, SignatureOptions};
 use chrono::Utc;
 use lopdf::ObjectId;
+use crate::signature_options::SignatureFormat;
 
 impl PDFSigningDocument {
     // Change the signature to add extra info about the signing application
@@ -108,10 +109,15 @@ impl PDFSigningDocument {
         // Get system time in UTC
         let now = Utc::now();
 
+        let sub_filter = match signature_options.format {
+            SignatureFormat::PKCS7 => {"adbe.pkcs7.detached"}
+            SignatureFormat::PADES => {"ETSI.CAdES.detached"}
+        };
+
         let v_dictionary = Dictionary(lopdf::Dictionary::from_iter(vec![
             ("Type", Name("Sig".as_bytes().to_vec())),
             ("Filter", Name("Adobe.PPKLite".as_bytes().to_vec())),
-            ("SubFilter", Name("adbe.pkcs7.detached".as_bytes().to_vec())),
+            ("SubFilter", Name(sub_filter.as_bytes().to_vec())),
             // The order of `ByteRange` and `Contents` is important.
             // They should not be moved or switched in ordering.
             (

@@ -196,7 +196,11 @@ pub(crate) fn encode_revocation_info_archival<'a>(
         revocation_vector.push(ocsp_tagged.to_captured(Der));
     }
 
-    Some(bcder::encode::sequence(revocation_vector).to_captured(Der))
+    if revocation_vector.len() > 0 {
+        Some(bcder::encode::sequence(revocation_vector).to_captured(Der))
+    } else {
+        None
+    }
 }
 
 pub(crate) fn build_adbe_revocation_attribute(
@@ -240,4 +244,11 @@ pub(crate) fn build_adbe_revocation_attribute(
     }
 
     return None;
+}
+
+pub(crate) fn append_dss_dictionary(
+    pdf_bytes: Vec<u8>,
+    user_certificate_chain: Vec<CapturedX509Certificate>,
+) -> Vec<u8> {
+    return pdf_bytes;
 }
