@@ -1,7 +1,10 @@
+use crate::Error;
 use bcder::encode::Values;
 use bcder::Mode::Der;
 use bcder::{encode::PrimitiveContent, Captured, Integer, Mode, OctetString, Oid, Tag};
 use cryptographic_message_syntax::Bytes;
+use lopdf::Object::{Array, Reference};
+use lopdf::{Dictionary, IncrementalDocument, Object, Stream, StringFormat};
 use rasn::ber::encode;
 use rasn::types::ObjectIdentifier;
 use rasn_ocsp::{CertId, Request, TbsRequest};
@@ -203,15 +206,15 @@ pub(crate) fn encode_revocation_info_archival<'a>(
     }
 }
 
-pub(crate) fn build_adbe_revocation_attribute(
+pub(crate) fn fetch_revocation_data(
     user_certificate_chain: &Vec<CapturedX509Certificate>,
     include_crl: bool,
     include_ocsp: bool,
-) -> Option<(Oid, Vec<AttributeValue>)> {
+) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
     let mut crl_data = Vec::new();
     let mut ocsp_data = Vec::new();
     for cert in user_certificate_chain {
-        let (ocsp_url, crl_url) = get_ocsp_crl_url(cert);
+        let (ocsp_url, crl_url) = get_ocsp_crl_url(&cert);
 
         if include_ocsp {
             if let Some(ocsp) = ocsp_url {
@@ -231,6 +234,17 @@ pub(crate) fn build_adbe_revocation_attribute(
         }
     }
 
+    return (crl_data, ocsp_data);
+}
+
+pub(crate) fn build_adbe_revocation_attribute(
+    user_certificate_chain: &Vec<CapturedX509Certificate>,
+    include_crl: bool,
+    include_ocsp: bool,
+) -> Option<(Oid, Vec<AttributeValue>)> {
+    let (crl_data, ocsp_data) =
+        fetch_revocation_data(user_certificate_chain, include_crl, include_ocsp);
+
     let encoded_revocation_info = encode_revocation_info_archival(crl_data, ocsp_data);
     if encoded_revocation_info.is_some() {
         let adbe_revocation_oid = Oid(Bytes::copy_from_slice(&[
@@ -249,6 +263,78 @@ pub(crate) fn build_adbe_revocation_attribute(
 pub(crate) fn append_dss_dictionary(
     pdf_bytes: Vec<u8>,
     user_certificate_chain: Vec<CapturedX509Certificate>,
-) -> Vec<u8> {
-    return pdf_bytes;
+) -> Result<Vec<u8>, Error> {
+    //let mut file = std::fs::File::create("./signed.pdf").unwrap();
+    //file.write_all(&pdf_bytes).unwrap();
+
+    let mut doc = IncrementalDocument::load_from(pdf_bytes.as_slice())?;
+    doc.new_document.version = "1.5".parse().unwrap();
+
+    let (crl_data, ocsp_data) = fetch_revocation_data(&user_certificate_chain, true, true);
+
+    let mut crl_streams = Vec::new();
+    for crl_datum in crl_data {
+        let crl_stream = Stream::new(Dictionary::new(), crl_datum);
+        crl_streams.push(crl_stream);
+    }
+
+    let mut ocsp_streams = Vec::new();
+    for ocsp_datum in ocsp_data {
+        let ocsp_stream = Stream::new(Dictionary::new(), ocsp_datum);
+        ocsp_streams.push(ocsp_stream);
+    }
+
+    let mut cert_streams = Vec::new();
+    for certificate in user_certificate_chain {
+        let cert = certificate.encode_der().unwrap();
+        let cert_stream = Stream::new(Dictionary::new(), cert);
+        cert_streams.push(cert_stream);
+    }
+
+    let crl_refs: Vec<Object> = crl_streams
+        .iter()
+        .map(|s| Reference(doc.new_document.add_object(s.clone())))
+        .collect();
+    let ocsp_refs: Vec<Object> = ocsp_streams
+        .iter()
+        .map(|s| Reference(doc.new_document.add_object(s.clone())))
+        .collect();
+    let cert_refs: Vec<Object> = cert_streams
+        .iter()
+        .map(|s| Reference(doc.new_document.add_object(s.clone())))
+        .collect();
+
+    let dss_dict = Dictionary::from_iter(vec![
+        ("CRLs", crl_refs.into()),
+        ("OCSPs", ocsp_refs.into()),
+        ("Certs", cert_refs.into()),
+    ]);
+
+    let dss_ref = doc.new_document.add_object(dss_dict);
+
+    // Get root ID
+    let catalog_id = doc
+        .get_prev_documents()
+        .trailer
+        .get(b"Root")
+        .unwrap()
+        .as_reference()?;
+    // Clone object
+    doc.opt_clone_object_to_new_document(catalog_id)?;
+    // Get Root in new document
+    let catalog = doc
+        .new_document
+        .get_object_mut(catalog_id)
+        .unwrap()
+        .as_dict_mut()
+        .unwrap();
+    catalog.set("DSS", dss_ref);
+
+    let mut buffer = Vec::new();
+    doc.save_to(&mut buffer).unwrap();
+
+    //let mut file = std::fs::File::create("./signed+ltv.pdf").unwrap();
+    //file.write_all(&buffer).unwrap();
+
+    return Ok(buffer);
 }

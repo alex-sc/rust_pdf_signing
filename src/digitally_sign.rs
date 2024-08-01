@@ -141,7 +141,7 @@ impl PDFSigningDocument {
         let mut pdf_file_data = Self::set_content(pdf_file_data, signature, signature_options);
 
         if signature_options.include_dss {
-            pdf_file_data = append_dss_dictionary(pdf_file_data, user_certificate_chain);
+            pdf_file_data = append_dss_dictionary(pdf_file_data, user_certificate_chain)?;
         }
 
         Ok(pdf_file_data)

@@ -1,8 +1,8 @@
+use crate::signature_options::SignatureFormat;
 use crate::{error::Error, UserSignatureInfo};
 use crate::{PDFSigningDocument, SignatureOptions};
 use chrono::Utc;
 use lopdf::ObjectId;
-use crate::signature_options::SignatureFormat;
 
 impl PDFSigningDocument {
     // Change the signature to add extra info about the signing application
@@ -110,8 +110,8 @@ impl PDFSigningDocument {
         let now = Utc::now();
 
         let sub_filter = match signature_options.format {
-            SignatureFormat::PKCS7 => {"adbe.pkcs7.detached"}
-            SignatureFormat::PADES => {"ETSI.CAdES.detached"}
+            SignatureFormat::PKCS7 => "adbe.pkcs7.detached",
+            SignatureFormat::PADES => "ETSI.CAdES.detached",
         };
 
         let v_dictionary = Dictionary(lopdf::Dictionary::from_iter(vec![

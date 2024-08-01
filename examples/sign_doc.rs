@@ -1,8 +1,8 @@
 use cryptographic_message_syntax::SignerBuilder;
+use pdf_signing::signature_options::SignatureFormat::{PADES, PKCS7};
 use pdf_signing::{PDFSigningDocument, SignatureOptions, UserSignatureInfo};
 use std::{fs::File, io::Write};
 use x509_certificate::{CapturedX509Certificate, InMemorySigningKeyPair};
-use pdf_signing::signature_options::SignatureFormat::PADES;
 
 fn main() {
     let pdf_file_name = "test-small-1sig.pdf";
@@ -27,7 +27,8 @@ fn main() {
     }];
 
     let mut signature_parameters: SignatureOptions = Default::default();
-    signature_parameters.format = PADES;
+    signature_parameters.format = PKCS7;
+    signature_parameters.include_dss = true;
     signature_parameters.signed_attribute_include_ocsp = false;
     signature_parameters.signed_attribute_include_crl = false;
 
